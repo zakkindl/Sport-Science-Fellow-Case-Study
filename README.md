@@ -1,1 +1,1 @@
-Oregon Athletics Sport Science Fellow: Case Study 
+Oregon Athletics Sport Science Fellow: Case Study  
