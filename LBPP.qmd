@@ -1,26 +1,460 @@
 ---
-title: "W Soccer - Lower Body Power Profiles"
-author: "Zak Kindl, MS, CPSS"
-format: html
+title: ""
+author: ""
+format: 
+  html:
+    page-layout: full  
+    code-overflow: wrap 
+toc: true
+toc-location: left
+execute:
+  fig-width: 10
+  fig-height: 6
+  warning: false
+  message: false
+bibliography: references.bib
 ---
+<div style="text-align: center;">
 
-## Quarto
+![](images/duck_logo.png){width=200px}
 
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+# UO Womens Soccer Power Profiles
+##### Zak Kindl, MS, CPSS
+##
+</div>
+```{r message=FALSE, warning=FALSE}
+#| include: false
 
-## Running Code
+library(tidyverse)
+library(janitor)
+library(skimr)
+library(flextable)
 
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+#Import data and begin initial exploration
 
-```{r}
-1 + 1
+data <- read_csv(file = 'data-raw/Soccer Force Plate Data.csv') |> 
+  #formats column names to a standard format adjust some data types like date
+  clean_names() |> 
+  mutate(date=mdy(date)) 
+
+#filter down to CMJ test specifically remove any entirely empty columns and provide brief overview of data
+data<-data |> 
+  filter(test_type=='CMJ') |>
+  remove_empty("cols") |> 
+  glimpse()
+
+# Instead of relying on calculated averages etc. just re-running from individual trial values
+data1<-data |>
+  group_by(date,athlete,position_group) |>
+  summarise(
+    across(where(is.numeric), ~mean(., na.rm = TRUE)),
+    across(where(is.character), ~first(.))
+  ) |>
+  mutate(peak_power_w_kg = peak_power_w / weight_kg,
+           concentric_rfd_100ms_n_s = abs(concentric_rfd_100ms_n_s)) |> ungroup()
+
+
+create_power_profile <- function(data, position_name) {
+  
+  data |> 
+    filter(position_group == position_name) |> 
+    mutate(across(c(peak_power_w_kg, concentric_rfd_100ms_n_s,), scale)) |> 
+    ggplot(aes(peak_power_w_kg, concentric_rfd_100ms_n_s)) +
+    annotate("rect", xmin = 0, xmax = Inf, ymin = 0, ymax = Inf, 
+             fill = "#d4edda", alpha = 0.4) +  
+    annotate("rect", xmin = -Inf, xmax = 0, ymin = 0, ymax = Inf, 
+             fill = "#fff3cd", alpha = 0.4) +  
+    annotate("rect", xmin = 0, xmax = Inf, ymin = -Inf, ymax = 0, 
+             fill = "#fff3cd", alpha = 0.4) +  
+    annotate("rect", xmin = -Inf, xmax = 0, ymin = -Inf, ymax = 0, 
+             fill = "#f8d7da", alpha = 0.4) + 
+    geom_smooth(method = "lm", se = FALSE, color = "grey40",
+                linetype = "dashed", linewidth = 1)+
+    geom_point(size = 5, alpha = 0.7) +
+    geom_text(aes(label = paste0("Athlete ", athlete)), 
+              size = 4, vjust = 2, colour = 'black') +
+    geom_vline(xintercept = 0, linetype = 'dashed', alpha = 0.5) +
+    geom_hline(yintercept = 0, linetype = 'dashed', alpha = 0.5) +
+    theme_minimal() +
+    labs(
+      x = "Relative Concentric Peak Power (W/kg)",
+      y = "Concentric RFD 100ms",
+      colour = "Position"
+    )+
+    theme(
+      plot.title = element_text(size = 16, face = "bold"),      
+      axis.title.x = element_text(size = 14),                   
+      axis.title.y = element_text(size = 14),                   
+      axis.text.x = element_text(size = 12),                    
+      axis.text.y = element_text(size = 12)                     
+    )
+}
+
+create_power_profile_2 <- function(data, position_name) {
+  
+  data |> 
+    filter(position_group == position_name) |> 
+    mutate(across(c(eccentric_peak_power_bm_w_kg, eccentric_braking_rfd_n_s,), scale)) |> 
+    ggplot(aes(eccentric_peak_power_bm_w_kg, eccentric_braking_rfd_n_s)) +
+    annotate("rect", xmin = 0, xmax = Inf, ymin = 0, ymax = Inf, 
+             fill = "#d4edda", alpha = 0.4) +  
+    annotate("rect", xmin = -Inf, xmax = 0, ymin = 0, ymax = Inf, 
+             fill = "#fff3cd", alpha = 0.4) +  
+    annotate("rect", xmin = 0, xmax = Inf, ymin = -Inf, ymax = 0, 
+             fill = "#fff3cd", alpha = 0.4) +  
+    annotate("rect", xmin = -Inf, xmax = 0, ymin = -Inf, ymax = 0, 
+             fill = "#f8d7da", alpha = 0.4) + 
+    geom_smooth(method = "lm", se = FALSE, color = "grey40",
+                linetype = "dashed", linewidth = 1)+
+    geom_point(size = 5, alpha = 0.7) +
+    geom_text(aes(label = paste0("Athlete ", athlete)), 
+              size = 4, vjust = 2, colour = 'black') +
+    geom_vline(xintercept = 0, linetype = 'dashed', alpha = 0.5) +
+    geom_hline(yintercept = 0, linetype = 'dashed', alpha = 0.5) +
+    theme_minimal() +
+    labs(
+      x = "Relative Eccentric Peak Power (W/kg)",
+      y = "Eccentric RFD",
+      colour = "Position"
+    )+
+    theme(
+      plot.title = element_text(size = 16, face = "bold"),      
+      axis.title.x = element_text(size = 14),                   
+      axis.title.y = element_text(size = 14),                   
+      axis.text.x = element_text(size = 12),                    
+      axis.text.y = element_text(size = 12)                     
+    )
+}
+
 ```
 
-You can add options to executable code like this 
+### Introduction & Selected Metrics 
+
+The athletic demands of women's soccer represent a unique challenge to the athlete and sport science unit. Specifically the lower body power demands which requires the ability to produce high forces over a short period of time and the ability to absorb high forces over a short period of time. The female athlete is especially susceptible to injury, specifically when a mismatch or overload of these demands occurs. The goal of this case study was to identify metrics that could provide insight into the lower body power demands of different players and position groups using, validated, reliable and repeatable measures of the CMJ to inform strength and conditioning recommendations and suggested interventions [@bishop2022],[@merrigan2021]. 
+
+The selected metrics are as follows 
+
+
+**- Relative Peak Power (W/kg)** 
+[@philpott2021]
+
+**- Peak Relative Eccentric Power (W/kg)** 
+[@philpott2021]
+
+**- Concentric RFD 100m/s** 
+[@martinopoulou2022]
+  
+**- Eccentric RFD** 
+[@nishiumi2023]
+
+  
+<p style="text-align: center; font-style: italic; color: gray;">
+Figure 1: CMJ force-time curve showing the temporal location of key performance metrics highlighted
+</p>
+
+![](images/cmj.png){width=1000px fig-align="center"}
+<p style="text-align: center; font-style: italic; color: gray;">
+NSCA, Essentials of Sport Science, 2021
+</p>
+
+
+### Position Groups Comparisson
+
+Values are scaled to a Z-score value
+
+A value of 0 represents the average values by position group, +/- values represent standard deviations above or below the average.
+
+The trend line indicates the direction the group is trending relative to the RFD and relative peak power linear relationship (ex. a position group is trending towards high power and slow RFD)
+
+### Concentric RFD to Relative Power
+
+::: {.panel-tabset}
+
+## Attackers
+```{r}
+#| echo: false
+#| message: false
+
+
+create_power_profile(data1, "Attacker") +
+
+  annotate("text", x = -.75, y = .75, label = "Low Power\nFast RFD", 
+           size = 5, alpha = 0.5) +
+  annotate("text", x = -.75, y = -.75, label = "Low Power\nSlow RFD", 
+           size = 5, alpha = 0.5)+
+  annotate("text", x = .5, y = .75, label = "High Power\nFast RFD", 
+           size = 5, alpha = 0.5) +
+  annotate("text", x = .5, y = -.75, label = "High Power\nSlow RFD", 
+           size = 5, alpha = 0.5) 
+
+```
+
+## Defenders
+```{r}
+#| echo: false
+#| message: false
+
+create_power_profile(data1, "Defender") +
+  annotate("text", x = .75, y = 1, label = "High Power\nFast RFD", 
+           size = 5, alpha = 0.5) +
+  annotate("text", x = -.5, y = 1, label = "Low Power\nFast RFD", 
+           size = 5, alpha = 0.5) +
+  annotate("text", x = .75, y = -.5, label = "High Power\nSlow RFD", 
+           size = 5, alpha = 0.5) +
+  annotate("text", x = -.5, y = -.5, label = "Low Power\nSlow RFD", 
+           size = 5, alpha = 0.5)
+```
+
+## Midfielders
+```{r}
+#| echo: false
+#| message: false
+
+create_power_profile(data1, "Midfield") +
+  annotate("text", x = .75, y = .75, label = "High Power\nFast RFD",
+           size = 5, alpha = 0.5) +
+  annotate("text", x = -.75, y = .75, label = "Low Power\nFast RFD",
+           size = 5, alpha = 0.5) +
+  annotate("text", x = .75, y = -1, label = "High Power\nSlow RFD",
+           size = 5, alpha = 0.5) +
+  annotate("text", x = -.75, y = -1, label = "Low Power\nSlow RFD",
+           size = 5, alpha = 0.5)
+```
+
+## Goalkeepers
+```{r}
+#| echo: false
+#| message: false
+
+create_power_profile(data1, "Goalkeeper") +
+  annotate("text", x = .75, y = .75, label = "High Power\nFast RFD", 
+           size = 5, alpha = 0.5) +
+  annotate("text", x = -.5, y = .75, label = "Low Power\nFast RFD", 
+           size = 5, alpha = 0.5) +
+  annotate("text", x = .75, y = -.75, label = "High Power\nSlow RFD", 
+           size = 5, alpha = 0.5) +
+  annotate("text", x = -.5, y = -.75, label = "Low Power\nSlow RFD", 
+           size = 5, alpha = 0.5)
+```
+
+
+:::
+
+### Eccentric RFD to Relative Power
+
+::: {.panel-tabset}
+
+## Attacker
+```{r}
+#| echo: false
+
+create_power_profile_2(data1,"Attacker")+
+  annotate("text", x = .5, y = 1, label = "High Energy Absorbtion\nFast Braking", 
+           size = 5, alpha = 0.5) +
+  annotate("text", x = -.5, y = 1, label = "Low Energy Absorbtion\nFast Braking", 
+           size = 5, alpha = 0.5) +
+  annotate("text", x = .5, y = -.5, label = "High Energy Absorbtion\nSlow Braking", 
+           size = 5, alpha = 0.5) +
+  annotate("text", x = -.5, y = -.5, label = "Low Energy Absorbtion\nSlow Braking", 
+           size = 5, alpha = 0.5)
+
+```
+
+## Defenders
+```{r}
+#| echo: false
+
+create_power_profile_2(data1,"Defender")+
+  annotate("text", x = .75, y = .75, label = "High Energy Absorbtion\nFast Braking", 
+           size = 5, alpha = 0.5) +
+  annotate("text", x = -1, y = .75, label = "Low Energy Absorbtion\nFast Braking", 
+           size = 5, alpha = 0.5) +
+  annotate("text", x = .75, y = -.75, label = "High Energy Absorbtion\nSlow Braking", 
+           size = 5, alpha = 0.5) +
+  annotate("text", x = -1, y = -.75, label = "Low Energy Absorbtion\nSlow Braking", 
+           size = 5, alpha = 0.5)
+```
+
+## Midfielders
+```{r}
+#| echo: false
+
+create_power_profile_2(data1,"Midfield")+
+  annotate("text", x = .75, y = 1, label = "High Energy Absorbtion\nFast Braking", 
+           size = 5, alpha = 0.5) +
+  annotate("text", x = -.5, y = 1, label = "Low Energy Absorbtion\nFast Braking", 
+           size = 5, alpha = 0.5) +
+  annotate("text", x = .75, y = -.5, label = "High Energy Absorbtion\nSlow Braking", 
+           size = 5, alpha = 0.5) +
+  annotate("text", x = -.5, y = -.5, label = "Low Energy Absorbtion\nSlow Braking", 
+           size = 5, alpha = 0.5)
+
+```
+
+## Goalkeepers
+```{r}
+#| echo: false
+
+create_power_profile_2(data1,"Goalkeeper")+
+  annotate("text", x = .75, y = .75, label = "High Energy Absorbtion\nFast Braking", 
+           size = 5, alpha = 0.5) +
+  annotate("text", x = -.5, y = .75, label = "Low Energy Absorbtion\nFast Braking", 
+           size = 5, alpha = 0.5) +
+  annotate("text", x = .75, y = -.75, label = "High Energy Absorbtion\nSlow Braking", 
+           size = 5, alpha = 0.5) +
+  annotate("text", x = -.5, y = -.75, label = "Low Energy Absorbtion\nSlow Braking", 
+           size = 5, alpha = 0.5)
+
+```
+
+:::
+
+### Summary Values
 
 ```{r}
 #| echo: false
-2 * 2
+
+table_data <- data1 |> 
+  mutate(concentric_mean_power_w_kg = concentric_mean_power_w/weight_kg,
+         eccentric_mean_power_w_kg = eccentric_mean_power_w/weight_kg) |> 
+  select(position_group, concentric_rfd_100ms_n_s, concentric_mean_power_w_kg,eccentric_mean_power_w_kg,eccentric_braking_rfd_n_s) |>
+  group_by(position_group) |> 
+  summarise(
+    mean_con_power = mean(concentric_mean_power_w_kg, na.rm = TRUE),
+    mean_ecc_power = mean(eccentric_mean_power_w_kg, na.rm = TRUE),
+    mean_con_rfd = mean(concentric_rfd_100ms_n_s, na.rm = TRUE),
+    mean_ecc_rfd = mean(eccentric_braking_rfd_n_s, na.rm = TRUE),
+  ) |>
+  mutate(
+    mean_con_power = round(mean_con_power, 1),
+    mean_con_rfd = round(mean_con_rfd, 0),
+    mean_ecc_power = round(mean_ecc_power, 1),
+    mean_ecc_rfd = round(mean_ecc_rfd, 0)
+  )
+
+flextable(table_data) |>
+  theme_booktabs() |>  
+  set_header_labels(
+    position_group = "Position Group",
+    mean_con_power = "Mean Con Power (W/kg)",
+    mean_ecc_power = "Mean Ecc Power (W/kg)",
+    mean_ecc_rfd = "Mean Ecc RFD",
+    mean_con_rfd = "Mean Con RFD (100ms)"
+    ) |>
+  border_remove() |>
+  hline_top(border = officer::fp_border(width = 2), part = "header") |>  
+  hline_bottom(border = officer::fp_border(width = 2), part = "header") |>
+  hline(i = seq_len(nrow(table_data) - 1), 
+        border = officer::fp_border(width = 0.5, color = "gray70")) |>  
+  hline_bottom(border = officer::fp_border(width = 2), part = "body") |>
+  align(align = "center", part = "all") |>
+  align(j = 1, align = "left", part = "all") |>
+  bold(j = 1, part = "body") |>
+  bold(part = "header") |>
+  width(width = 10)
+  
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+```{r}
+#| echo: false
+table_data_individual <- data1 |> 
+  mutate(
+    concentric_mean_power_w_kg = concentric_mean_power_w / weight_kg,
+    eccentric_mean_power_w_kg = eccentric_mean_power_w / weight_kg,
+    avg_score = (scale(concentric_mean_power_w_kg)[,1] + 
+                 scale(concentric_rfd_100ms_n_s)[,1]) / 2
+  ) |> 
+  select(athlete, position_group, concentric_mean_power_w_kg, 
+         eccentric_mean_power_w_kg, concentric_rfd_100ms_n_s, 
+         eccentric_braking_rfd_n_s, avg_score) |>
+  mutate(
+    concentric_mean_power_w_kg = round(concentric_mean_power_w_kg, 1),
+    eccentric_mean_power_w_kg = round(eccentric_mean_power_w_kg, 1),
+    concentric_rfd_100ms_n_s = round(concentric_rfd_100ms_n_s, 0),
+    eccentric_braking_rfd_n_s = round(eccentric_braking_rfd_n_s, 0)
+  ) |>
+  group_by(position_group) |>
+  arrange(position_group, avg_score) |>  
+  select(-avg_score) |>  
+  ungroup()
+
+position_change_rows <- c(1, which(table_data_individual$position_group[-1] != 
+                          table_data_individual$position_group[-nrow(table_data_individual)]) + 1)
+
+flextable(table_data_individual) |>
+  theme_booktabs() |>  
+  set_header_labels(
+    athlete = "Athlete",
+    position_group = "Position",
+    concentric_mean_power_w_kg = "Con Power\n(W/kg)",
+    eccentric_mean_power_w_kg = "Ecc Power\n(W/kg)",
+    concentric_rfd_100ms_n_s = "Con RFD\n(N/s)",
+    eccentric_braking_rfd_n_s = "Ecc RFD\n(N/s)"
+  ) |>
+  border_remove() |>
+  hline_top(border = officer::fp_border(width = 2), part = "header") |>  
+  hline_bottom(border = officer::fp_border(width = 2), part = "header") |>
+  hline(
+    i = which(table_data_individual$position_group[-1] != 
+              table_data_individual$position_group[-nrow(table_data_individual)]),
+    border = officer::fp_border(width = 1.5, color = "gray40")
+  ) |>
+  hline_bottom(border = officer::fp_border(width = 2), part = "body") |>
+  align(align = "center", part = "all") |>
+  align(j = 1:2, align = "left", part = "all") |>  
+  bold(part = "header") |>
+  bg(i = position_change_rows, bg = "#f0f0f0", part = "body") |>
+  width(j = 1, width = 1.5) |>
+  width(j = 2, width = 2) |>
+  width(j = 3:6, width = 1.5) |> 
+  width(width = 10)
+
+```
+
+
+### Exercise Recommendations
+
+**Common Deficiencies:**
+
+- **Low Eccentric Power Capability**
+
+- **Low Breaking Force Capability**  
+
+- **Low Power Production in Defensive Groups**
+
+
+**Recommendations**
+
+Work on concentric eccentric imbalance with both fast and slow eccentric work while continuing to improve concentric RFD and peak power with weighted jumps and near 1RM lifts complimented with plyometric components for reactivity. 
+
+**Strength:**
+
+- Eccentric barbell back squat with high load > 1RM
+
+- Single leg dumbbell squat emphasis on eccentric tempo
+
+- Nordic curls with emphasis on control through full ROM, utilize variations if needed
+
+- Loaded trap bar jumps with light to moderate load
+
+**Plyo:** 
+
+- Bounds
+
+- Depth drop jumps 
+
+- Band assisted jumps double or single leg
+
+
+### Future Analysis 
+
+With further data context, sources and testing dates a variety of further analysis could be conducted to aid the S&C and coaching staff in athlete development. Some future analysis options could include:
+
+- Further exploration of other jump tests to create detail eccentric concentric power and force ratios.
+
+- Exploration of L/R asymmetries and threshold of asymetry concern.
+
+- Analysis of raw force time data to identify different jumping strategies win force time curve profiles.
+
+- Detailed force velocity profile measuring force across various velocities to determine peak force velocity relationship.
+
